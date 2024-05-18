@@ -3,6 +3,7 @@ using CsvHelper.Configuration;
 using ETL.DataLayer;
 using ETL.DataLayer.Entities;
 using ETL.Mappers;
+using ETL.Services;
 using System.Globalization;
 
 class Program
@@ -25,9 +26,9 @@ class Program
 			csv.Context.RegisterClassMap<TaxiRideMap>();
 
 			var records = csv.GetRecords<TaxiRide>().ToList();
-			var cleanedRecords = CleanData(records);
-			var duplicateRecords = GetDuplicateRecords(cleanedRecords);
-			SaveDuplicatesToFile(duplicateRecords, duplicateFilePath);
+			var cleanedRecords = TaxiRideService.CleanData(records);
+			var duplicateRecords = TaxiRideService.GetDuplicateRecords(cleanedRecords);
+			TaxiRideService.SaveDuplicatesToFile(duplicateRecords, duplicateFilePath);
 			cleanedRecords = cleanedRecords.Except(duplicateRecords).ToList();
 
 			using (var context = new TaxiRideContext())
@@ -39,29 +40,5 @@ class Program
 		}
 	}
 
-	static List<TaxiRide> CleanData(List<TaxiRide> records)
-	{
-		return records.Select(record =>
-		{
-			record.store_and_fwd_flag = record.store_and_fwd_flag == "Y" ? "Yes" : "No";
-			return record;
-		}).ToList();
-	}
-
-	static List<TaxiRide> GetDuplicateRecords(List<TaxiRide> records)
-	{
-		return records.GroupBy(r => new { r.tpep_pickup_datetime, r.tpep_dropoff_datetime, r.passenger_count })
-					  .Where(g => g.Count() > 1)
-					  .SelectMany(g => g)
-					  .ToList();
-	}
-
-	static void SaveDuplicatesToFile(List<TaxiRide> duplicates, string filePath)
-	{
-		using (var writer = new StreamWriter(filePath))
-		using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-		{
-			csv.WriteRecords(duplicates);
-		}
-	}
+	
 }
